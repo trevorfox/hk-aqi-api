@@ -1,4 +1,4 @@
-#!usr/bin/pyhton
+#!usr/bin/python
 
 import aqi
 import requests
@@ -65,21 +65,32 @@ def health_range(current_aqi):
     rng ="Hazardous"
   return rng
 
-def decode_date(date_string):
-  dmy = date_string.split()[0].split("-")
-  year = int(dmy[0].strip())
-  month = int(dmy[1].strip())
-  day = int(dmy[2].strip())
-  hour = int(date_string.split()[1].split(":")[0])
-  date = datetime(year,month,day,hour)
-  hk_tz = pytz.timezone('Asia/Hong_Kong')
-  # date obj localized to HK
-  hk_date = hk_tz.localize(date)
-  # utc timestamp localized to HK
-  hk_timestamp = calendar.timegm(hk_date.utctimetuple())
-  # MySQL TIMESTAMP formatted string
-  hk_sql_timestamp = hk_date.strftime('%Y-%m-%d %H:%M:%S')
-  return hk_date, hk_sql_timestamp, hk_timestamp
+class DateDecoder():
+
+    def __init__(self, date_string, timezone='UTC'):
+        dmy = date_string.split()[0].split("-")
+        year = int(dmy[0].strip())
+        month = int(dmy[1].strip())
+        day = int(dmy[2].strip())
+        hour = int(date_string.split()[1].split(":")[0])
+        self.date = datetime(year,month,day,hour)
+        self.timezone = pytz.timezone(timezone)
+        self.local_date = self.timezone.localize(self.date)
+
+    def date(self):
+        return self.date
+
+    def localDate(self):
+        # date obj localized to HK
+        return self.local_date
+
+    def timestamp(self):
+        # utc timestamp localized to HK
+        return calendar.timegm(self.local_date.utctimetuple())
+
+    def sqlTimestamp(self):
+        # MySQL TIMESTAMP formatted string
+        return self.local_date.strftime('%Y-%m-%d %H:%M:%S')
 
 def prepare_data(soup, location_code, location_info):
 
@@ -93,9 +104,9 @@ def prepare_data(soup, location_code, location_info):
     tds = row.find_all("td")
     # parse dates from ugly unicode table data
     date_string = tds[0].text
-    hk_sql_timestamp = decode_date(date_string)[1]
+    scrape_date = DateDecoder(date_string, timezone='Asia/Hong_Kong')
     # replace scraped date value with SQL timestamp
-    values = [hk_sql_timestamp]
+    values = [scrape_date.sqlTimestamp()]
 
     # type check table values.
     for td in tds[1:]:
